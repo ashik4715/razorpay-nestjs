@@ -17,6 +17,7 @@ npm run start:dev
 | http://localhost:3000/api/docs | **Swagger UI** (Try it out) |
 | http://localhost:3000/api/docs-json | OpenAPI 3.0 document |
 | http://localhost:3000/api/v1/health | Health + configured key mode |
+| http://localhost:3000/checkout?orderId=… | Hosted Test Mode Checkout demo |
 
 ### Environment (`.env`)
 
@@ -51,35 +52,48 @@ Base path: `/api/v1`
 | POST | `/invoices` | Create invoice with inline customer + line items |
 | GET | `/invoices` | List invoices (`type`, `payment_id`, `receipt`, `customer_id`) |
 | GET | `/invoices/:invoiceId` | Fetch invoice / billing record |
+| POST | `/payment-links` | Create hosted Payment Link (Test Mode Success button) |
+| GET | `/payment-links` | List payment links |
+| GET | `/payment-links/:id` | Fetch payment link |
+| POST | `/payment-links/:id/cancel` | Cancel payment link |
+| GET | `/reports/transactions` | Client-facing transaction report |
+| GET | `/checkout?orderId=` | Hosted Razorpay Checkout demo page (HTML) |
 | POST | `/webhooks/razorpay` | Signed webhook receiver (raw-body HMAC) |
 
 ---
 
 ## Payment flow (demo)
 
+> **Important:** `POST /orders` only creates an order shell. The Razorpay dashboard will show **Created / Attempts 0 / No Payments** until a human completes Test Mode checkout. There is no server-side API to “fake” a payment.
+
+### Path A — Payment Link (easiest for client demos)
+
+1. **Create a link**
+   ```bash
+   curl -X POST http://localhost:3000/api/v1/payment-links \
+     -H 'Content-Type: application/json' \
+     -d '{"amount":99,"currency":"INR","description":"Demo payment","reference_id":"REF-1"}'
+   ```
+2. Open the returned `short_url` in a browser (e.g. `https://rzp.io/rzp/...`).
+3. In **Test Mode**, choose **Success** (no card needed) or complete with a test card.
+4. Payment appears under dashboard **Payments → Transactions** and in:
+   ```bash
+   curl http://localhost:3000/api/v1/reports/transactions
+   ```
+
+### Path B — Hosted Checkout page (order → Paid)
+
 1. **Create an order**
    ```bash
    curl -X POST http://localhost:3000/api/v1/orders \
      -H 'Content-Type: application/json' \
-     -d '{"amount":499,"currency":"INR","receipt":"rcpt_demo_1","notes":{"customer_id":"cust_1"}}'
+     -d '{"amount":499,"currency":"INR","receipt":"rcpt_demo_1"}'
    ```
-   Response includes `id` (`order_...`), `amount` (in paise), `currency`.
-
-2. **Checkout** — open the Razorpay Checkout widget with `key_id` + `order_id` (use Razorpay test cards/UPI in Test Mode).
-
-3. **Verify on your server** with the handler payload from Checkout:
-   ```bash
-   curl -X POST http://localhost:3000/api/v1/payments/verify \
-     -H 'Content-Type: application/json' \
-     -d '{
-       "razorpay_order_id": "order_...",
-       "razorpay_payment_id": "pay_...",
-       "razorpay_signature": "<from checkout handler>"
-     }'
-   ```
-   On `200`, mark the order paid in your database. On `401`, reject.
-
-4. **Optional:** fetch the payment, refund it, or create an invoice — all available in Swagger “Try it out”.
+2. Open **`http://localhost:3000/checkout?orderId=order_...`** and click **Pay**.
+   - Test card: `4111 1111 1111 1111` · any future expiry · any CVV  
+   - UPI: `success@razorpay`
+3. Handler posts to `POST /api/v1/payments/verify` — on `200/201`, mark paid.
+4. Order status → **Paid**, Attempts → **1**, and a Payments row appears on the order.
 
 ---
 
@@ -124,10 +138,14 @@ razorpay-nestjs/
 │       │   ├── payments.controller.ts
 │       │   ├── refunds.controller.ts
 │       │   ├── invoices.controller.ts
+│       │   ├── payment-links.controller.ts
+│       │   ├── reports.controller.ts
+│       │   ├── checkout.controller.ts
 │       │   └── webhooks.controller.ts
 │       ├── dto/
 │       │   ├── order.dto.ts
 │       │   ├── payment.dto.ts
+│       │   ├── payment-link.dto.ts
 │       │   ├── invoice.dto.ts
 │       │   └── webhook.dto.ts
 │       └── common/

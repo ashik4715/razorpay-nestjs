@@ -22,6 +22,11 @@ import {
   VerifyPaymentDto,
 } from './dto/payment.dto';
 import { CreateOrderDto } from './dto/order.dto';
+import {
+  CreatePaymentLinkDto,
+  ListPaymentLinksQueryDto,
+  ListPaymentsReportQueryDto,
+} from './dto/payment-link.dto';
 
 export interface HealthStatus {
   status: 'ok';
@@ -80,6 +85,122 @@ export class RazorpayService {
       keyId: maskKeyId(this.keyId),
       timestamp: new Date().toISOString(),
     };
+  }
+
+  getKeyId(): string {
+    return this.keyId;
+  }
+
+  async createPaymentLink(dto: CreatePaymentLinkDto) {
+    const currency = dto.currency ?? 'INR';
+    try {
+      const payload: Record<string, unknown> = {
+        amount: toMinorUnits(dto.amount, currency),
+        currency,
+        description: dto.description,
+        reference_id: dto.reference_id,
+        customer: dto.customer,
+        notes: dto.notes,
+        accept_partial: dto.accept_partial ?? false,
+      };
+      if (dto.callback_url) {
+        payload.callback_url = dto.callback_url;
+        payload.callback_method = 'get';
+      }
+      if (dto.expire_by) payload.expire_by = dto.expire_by;
+
+      return await this.razorpay.paymentLink.create(payload as never);
+    } catch (error) {
+      throw mapRazorpayError(error, 'Failed to create payment link');
+    }
+  }
+
+  async listPaymentLinks(query: ListPaymentLinksQueryDto) {
+    try {
+      return await this.razorpay.paymentLink.all({
+        count: query.count ?? 10,
+        skip: query.skip ?? 0,
+      });
+    } catch (error) {
+      throw mapRazorpayError(error, 'Failed to list payment links');
+    }
+  }
+
+  async getPaymentLink(paymentLinkId: string) {
+    try {
+      return await this.razorpay.paymentLink.fetch(paymentLinkId);
+    } catch (error) {
+      throw mapRazorpayError(error, `Failed to fetch payment link ${paymentLinkId}`);
+    }
+  }
+
+  async cancelPaymentLink(paymentLinkId: string) {
+    try {
+      return await this.razorpay.paymentLink.cancel(paymentLinkId);
+    } catch (error) {
+      throw mapRazorpayError(error, `Failed to cancel payment link ${paymentLinkId}`);
+    }
+  }
+
+  async getTransactionReport(query: ListPaymentsReportQueryDto) {
+    try {
+      const collection = (await this.razorpay.payments.all({
+        count: query.count ?? 10,
+        skip: query.skip ?? 0,
+      })) as unknown as {
+        count?: number;
+        items?: Array<Record<string, unknown>>;
+      };
+
+      const items = collection.items ?? [];
+      const byStatus: Record<string, number> = {
+        created: 0,
+        authorized: 0,
+        captured: 0,
+        failed: 0,
+        refunded: 0,
+      };
+      let totalAmount = 0;
+      let currency = 'INR';
+
+      const transactions = items.map((p) => {
+        const status = String(p.status ?? 'created');
+        byStatus[status] = (byStatus[status] ?? 0) + 1;
+        const amount = Number(p.amount ?? 0);
+        totalAmount += amount;
+        if (p.currency) currency = String(p.currency);
+        return {
+          payment_id: p.id,
+          order_id: p.order_id,
+          amount,
+          amount_display: `${p.currency === 'INR' ? '₹' : ''}${(amount / 100).toFixed(2)} ${p.currency ?? ''}`.trim(),
+          currency: p.currency,
+          status,
+          method: p.method,
+          email: p.email,
+          contact: p.contact,
+          amount_refunded: p.amount_refunded ?? 0,
+          created_at: p.created_at,
+        };
+      });
+
+      return {
+        generated_at: new Date().toISOString(),
+        mode: this.keyId.startsWith('rzp_live') ? 'live' : 'test',
+        summary: {
+          total_transactions: transactions.length,
+          total_amount_minor: totalAmount,
+          currency,
+          by_status: byStatus,
+        },
+        transactions,
+        note: transactions.length
+          ? 'Payments completed in Test Mode appear here.'
+          : 'No payments yet — open a Payment Link short_url or /checkout?orderId=... and complete Test Mode payment.',
+      };
+    } catch (error) {
+      throw mapRazorpayError(error, 'Failed to build transaction report');
+    }
   }
 
   async createOrder(dto: CreateOrderDto) {

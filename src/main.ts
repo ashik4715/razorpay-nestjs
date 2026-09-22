@@ -25,14 +25,18 @@ async function bootstrap(): Promise<void> {
         '',
         '### Flow',
         '1. `POST /api/v1/orders` — create a server-side order.',
-        '2. Complete checkout on the client with the Razorpay Checkout widget using the returned `key_id` + `order_id`.',
-        '3. `POST /api/v1/payments/verify` — verify the `order_id | payment_id` HMAC signature.',
-        '4. Optionally capture, refund, or fetch invoices/payments.',
+        '2. **Pay (needed for dashboard Payments/Reports):**',
+        '   - Open `/checkout?orderId=...` (hosted Checkout demo), **or**',
+        '   - `POST /api/v1/payment-links` → open `short_url` → pick **Success** in Test Mode.',
+        '3. `POST /api/v1/payments/verify` — verify the checkout signature.',
+        '4. `GET /api/v1/reports/transactions` — client-facing transaction report.',
+        '',
+        '> Orders alone stay **Created / No Payments** until someone completes Test Mode checkout.',
         '',
         '### Notes',
         '- All monetary inputs are accepted in **major currency units** (e.g. `499` = ₹499) and converted to minor units (paise) server-side before calling Razorpay.',
         '- Webhook payloads are signature-checked against `RAZORPAY_WEBHOOK_SECRET` using the raw request body.',
-        '- Swagger UI: `/api/docs` · OpenAPI JSON: `/api/docs-json`.',
+        '- Swagger UI: `/api/docs` · OpenAPI JSON: `/api/docs-json` · Checkout demo: `/checkout`.',
       ].join('\n'),
     )
     .setVersion('1.0.0')
@@ -41,6 +45,9 @@ async function bootstrap(): Promise<void> {
     .addTag('payments', 'Payment fetch, verify, capture')
     .addTag('refunds', 'Full and partial refunds')
     .addTag('invoices', 'Razorpay invoice / billing records')
+    .addTag('payment-links', 'Hosted pay links (real Test Mode payments)')
+    .addTag('reports', 'Transaction report for clients')
+    .addTag('demo-checkout', 'Hosted Checkout HTML demo')
     .addTag('webhooks', 'Signed webhook receiver')
     .addServer('http://localhost:3000', 'Local sandbox')
     .build();
