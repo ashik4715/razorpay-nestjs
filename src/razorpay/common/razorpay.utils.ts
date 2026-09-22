@@ -22,25 +22,24 @@ interface RazorpayErrorShape {
 export function mapRazorpayError(error: unknown, fallback: string): HttpException {
   const err = (error ?? {}) as RazorpayErrorShape;
   const status = Number(err.statusCode) || 500;
-  const description =
-    err.error?.description || err.description || err.message || fallback;
+  const rawDescription = err.error?.description || err.description || err.message;
+  const description = rawDescription || fallback;
   const code = err.error?.code || err.code;
-
-  const payload = { message: description, code, provider: 'razorpay' };
 
   const notFound =
     status === 404 ||
-    /does not exist|not exist|not found|not a valid id|no .* found/i.test(
-      description,
-    );
+    (rawDescription !== undefined &&
+      /does not exist|not exist|not found|no .* found/i.test(rawDescription));
 
   if (notFound) {
     return new NotFoundException({
-      ...payload,
-      message: description || 'Resource not found',
+      message: rawDescription || 'Resource not found',
       code: code || 'NOT_FOUND',
+      provider: 'razorpay',
     });
   }
+
+  const payload = { message: description, code, provider: 'razorpay' };
   if (status === 401) return new UnauthorizedException(payload);
   if (status === 400 || status === 422) return new BadRequestException(payload);
   return new BadGatewayException(payload);

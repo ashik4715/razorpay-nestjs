@@ -2,7 +2,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
-  IsIn,
   IsNotEmpty,
   IsNumber,
   IsObject,
@@ -108,10 +107,14 @@ export class ListRefundsQueryDto {
   @ApiPropertyOptional({
     example: 'pay_QHI3aBcDeFgHiJ',
     description: 'Filter refunds for this payment.',
+    pattern: '^pay_[A-Za-z0-9]+$',
   })
   @IsOptional()
   @IsString()
   @IsNotEmpty()
+  @Matches(/^pay_[A-Za-z0-9]+$/, {
+    message: 'payment_id must be a valid Razorpay payment id (pay_...)',
+  })
   payment_id?: string;
 
   @ApiPropertyOptional({ example: 10, default: 10, minimum: 1, maximum: 100 })
@@ -132,12 +135,45 @@ export class ListRefundsQueryDto {
 
 export class ListInvoicesQueryDto {
   @ApiPropertyOptional({
-    example: 'paid',
-    enum: ['draft', 'issued', 'paid', 'partially_paid', 'expired', 'cancelled'],
+    example: 'invoice',
+    description: 'Filter by invoice type. Defaults to all types.',
   })
   @IsOptional()
-  @IsIn(['draft', 'issued', 'paid', 'partially_paid', 'expired', 'cancelled'])
-  payment_status?: string;
+  @IsString()
+  @IsNotEmpty()
+  type?: string;
+
+  @ApiPropertyOptional({
+    example: 'inv_QHI5uVwXyZaBcD',
+    description: 'Filter by related payment id.',
+    pattern: '^pay_[A-Za-z0-9]+$',
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^pay_[A-Za-z0-9]+$/, {
+    message: 'payment_id must be a valid Razorpay payment id (pay_...)',
+  })
+  payment_id?: string;
+
+  @ApiPropertyOptional({ example: 'receipt_001', description: 'Filter by your receipt reference.' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  receipt?: string;
+
+  @ApiPropertyOptional({
+    example: 'cust_Tf6eRdimct9knL',
+    description: 'Filter invoices for a customer.',
+    pattern: '^cust_[A-Za-z0-9]+$',
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^cust_[A-Za-z0-9]+$/, {
+    message: 'customer_id must be a valid Razorpay customer id (cust_...)',
+  })
+  customer_id?: string;
 
   @ApiPropertyOptional({ example: 10, default: 10, minimum: 1, maximum: 100 })
   @IsOptional()

@@ -49,7 +49,7 @@ Base path: `/api/v1`
 | GET | `/refunds` | List refunds (optional `payment_id`) |
 | GET | `/refunds/:refundId` | Fetch refund status |
 | POST | `/invoices` | Create invoice with inline customer + line items |
-| GET | `/invoices` | List invoices (optional `payment_status`) |
+| GET | `/invoices` | List invoices (`type`, `payment_id`, `receipt`, `customer_id`) |
 | GET | `/invoices/:invoiceId` | Fetch invoice / billing record |
 | POST | `/webhooks/razorpay` | Signed webhook receiver (raw-body HMAC) |
 

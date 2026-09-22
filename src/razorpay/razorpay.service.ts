@@ -3,6 +3,7 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -237,6 +238,14 @@ export class RazorpayService {
       if (query.payment_id) options.payment_id = query.payment_id;
       return await this.razorpay.refunds.all(options as never);
     } catch (error) {
+      const status = Number((error as { statusCode?: number })?.statusCode);
+      if (query.payment_id && (status === 400 || status === 404)) {
+        throw new NotFoundException({
+          message: `No refunds found for payment ${query.payment_id}`,
+          code: 'NOT_FOUND',
+          provider: 'razorpay',
+        });
+      }
       throw mapRazorpayError(error, 'Failed to list refunds');
     }
   }
@@ -286,7 +295,10 @@ export class RazorpayService {
   }
 
   async listInvoices(query: {
-    payment_status?: string;
+    type?: string;
+    payment_id?: string;
+    receipt?: string;
+    customer_id?: string;
     count?: number;
     skip?: number;
   }) {
@@ -295,7 +307,10 @@ export class RazorpayService {
         count: query.count ?? 10,
         skip: query.skip ?? 0,
       };
-      if (query.payment_status) options.payment_status = query.payment_status;
+      if (query.type) options.type = query.type;
+      if (query.payment_id) options.payment_id = query.payment_id;
+      if (query.receipt) options.receipt = query.receipt;
+      if (query.customer_id) options.customer_id = query.customer_id;
       return await this.razorpay.invoices.all(options as never);
     } catch (error) {
       throw mapRazorpayError(error, 'Failed to list invoices');

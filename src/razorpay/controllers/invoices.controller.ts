@@ -33,7 +33,8 @@ export class InvoicesController {
   @Get()
   @ApiOperation({
     summary: 'List invoices',
-    description: 'List invoices, optionally filtered by `payment_status`.',
+    description:
+      'List invoices. Optional filters: `type`, `payment_id`, `receipt`, `customer_id`.',
   })
   @ApiOkResponse({
     description: 'Invoice collection',
